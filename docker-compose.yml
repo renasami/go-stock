@@ -1,0 +1,29 @@
+version: '3.7'
+
+services:    
+  api:
+    container_name: api
+    build:
+      context: .
+      dockerfile: ./api/Dockerfile
+    ports:
+      - 8000:80
+    restart: always
+    tty: true
+    volumes:
+      - ./api:/go/src/app
+  db:
+    image: mariadb:latest
+    container_name: db
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: db
+      MYSQL_USER: master
+      MYSQL_PASSWORD: password
+      TZ: Asia/Tokyo
+    volumes:
+    - ./db/data:/var/lib/mysql
+    - ./db/my.cnf:/etc/mysql/conf.d/my.cnf
+    - ./db/sql:/docker-entrypoint-initdb.d
+    ports:
+    - 3306:3306
