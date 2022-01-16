@@ -1,30 +1,32 @@
 <script lang="ts">
-	export let name: string;
+  import { onMount, tick } from 'svelte';
+  let socket
+  let message
+  onMount(() => {
+    socket = new WebSocket('ws://localhost:8000/ws');
+    socket.onopen = () => {
+      console.log('socket connected');
+  };
+  socket.onopen = () => {
+      console.log('socket connected');
+  };
+
+  socket.onmessage = (event) => {
+      if(!event.data) { return }
+      message = JSON.parse(event.data);
+      console.log(message)
+    };
+  });
+
+
 </script>
 
 <main>
-	<h1>Hello {name}!</h1>
-	<p>Visit the <a href="https://svelte.dev/tutorial">Svelte tutorial</a> to learn how to build Svelte apps.</p>
+	<button class="px-4 py-2 text-white bg-red-600 rounded shadow">ボタンテスト</button>
 </main>
 
-<style>
-	main {
-		text-align: center;
-		padding: 1em;
-		max-width: 240px;
-		margin: 0 auto;
-	}
-
-	h1 {
-		color: #ff3e00;
-		text-transform: uppercase;
-		font-size: 4em;
-		font-weight: 100;
-	}
-
-	@media (min-width: 640px) {
-		main {
-			max-width: none;
-		}
-	}
+<style global  lang="postcss" >
+  @tailwind base;
+  @tailwind components;
+  @tailwind utilities;
 </style>
