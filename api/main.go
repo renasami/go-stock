@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"bytes"
 
 	"github.com/gorilla/mux"
 	"github.com/labstack/echo/v4"
@@ -33,6 +34,7 @@ func sayhelloName(w http.ResponseWriter, r *http.Request) {
 func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello, World")
 }
+
 func handleWebSocket(c echo.Context) error {
 	websocket.Handler(func(ws *websocket.Conn) {
 		defer ws.Close()
@@ -44,14 +46,14 @@ func handleWebSocket(c echo.Context) error {
 		}
 
 		// Client からのメッセージを読み込む
-		msg := ""
+		var msg string
 		err = websocket.Message.Receive(ws, &msg)
 		if err != nil {
 			c.Logger().Error(err)
 		}
 
 		// Client からのメッセージを元に返すメッセージを作成し送信する
-		er := websocket.Message.Send(ws, fmt.Sprintf("Server: \"%s\" received!", msg))
+		er := websocket.Message.Send(ws, fmt.Sprintf("eceived!"))
 		if er != nil {
 			c.Logger().Error(er)
 		}
@@ -63,6 +65,64 @@ func handleWebSocket(c echo.Context) error {
 
 	}).ServeHTTP(c.Response(), c.Request())
 	return nil
+}
+
+func getRealtimeETHRate(c echo.Context, coin string) interface{} {
+	wsUrl := "wss://api.coin.z.com/ws/public/v1"
+	baseUrl := "https://api.coin.z.com"
+	sendMsg := (`{
+        "command": "subscribe",
+        "channel": "ticker",
+        "symbol": "ETH"
+    }`)
+
+	var rate string
+
+    ws, _ := websocket.Dial(wsUrl, "", baseUrl)
+    websocket.Message.Send(ws, sendMsg)
+	for {
+		err := websocket.Message.Receive(ws, &rate)
+		if err != nil {
+			c.Logger().Error(err)
+		}
+		fmt.Print(rate)
+	}
+}
+func getRealtimeBTCRate(c echo.Context) error {
+	wsUrl := "wss://api.coin.z.com/ws/public/v1"
+	baseUrl := "https://api.coin.z.com"
+	sendMsg := (`{
+        "command": "subscribe",
+        "channel": "ticker",
+        "symbol": "BTC"
+    }`)
+
+	var rate string
+
+    ws, _ := websocket.Dial(wsUrl, "", baseUrl)
+    websocket.Message.Send(ws, sendMsg)
+	websocket.Handler(func(wss *websocket.Conn) {
+	for {
+		err := websocket.Message.Receive(wss,&rate)
+		var buf bytes.Buffer
+        json.Indent(&buf, []byte(rate), "", "  ")
+
+		if err != nil {
+			fmt.Println("ERRRRRRRRR")
+			fmt.Println(err)
+		}
+		websocket.JSON.Send(wss,buf.String())
+	}
+
+	}).ServeHTTP(c.Response(), c.Request())
+	return nil
+	// for {
+	// 	err := websocket.Message.Receive(ws, &rate)
+	// 	if err != nil {
+	// 		c.Logger().Error(err)
+	// 	}
+	// 	fmt.Print(rate)
+	// }
 }
 
 func autoWebSocket(c echo.Context) error {
@@ -79,35 +139,7 @@ func autoWebSocket(c echo.Context) error {
 	return nil
 }
 
-type ExchangeRate struct {
-	Status bool `json:"status"`
-	Result struct {
-		Datetime string `json:"datetime"`
-		Rate     struct {
-			Usdjpy float64 `json:"USDJPY"`
-			Eurjpy float64 `json:"EURJPY"`
-			Eurusd float64 `json:"EURUSD"`
-			Audjpy float64 `json:"AUDJPY"`
-			Gbpjpy float64 `json:"GBPJPY"`
-			Nzdjpy float64 `json:"NZDJPY"`
-			Cadjpy float64 `json:"CADJPY"`
-			Chfjpy float64 `json:"CHFJPY"`
-			Hkdjpy float64 `json:"HKDJPY"`
-			Gbpusd float64 `json:"GBPUSD"`
-			Usdchf float64 `json:"USDCHF"`
-			Zarjpy float64 `json:"ZARJPY"`
-			Audusd float64 `json:"AUDUSD"`
-			Nzdusd float64 `json:"NZDUSD"`
-			Euraud float64 `json:"EURAUD"`
-			Tryjpy float64 `json:"TRYJPY"`
-			Cnhjpy float64 `json:"CNHJPY"`
-			Nokjpy float64 `json:"NOKJPY"`
-			Sekjpy float64 `json:"SEKJPY"`
-			Mxnjpy float64 `json:"MXNJPY"`
-		} `json:"rate"`
-	} `json:"result"`
-}
-
+//外為オンラインから来たデータをエンコード
 func getExchangeRate(c echo.Context) interface{} {
 	// resp, err := http.Get("http://fx.mybluemix.net/")
 	resp, err := http.Get("https://www.gaitameonline.com/rateaj/getrate")
@@ -138,9 +170,9 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Static("/", "public")
 	e.GET("/ws", autoWebSocket)
-	e.GET("/wss", handleWebSocket)
+	e.GET("/wss", getRealtimeBTCRate)
 	e.Logger.Fatal(e.Start(":80"))
-
+	
 	r := mux.NewRouter()
 	logger := logging.Logger()
 	http.HandleFunc("/hello", sayhelloName)

@@ -1,12 +1,14 @@
 <script>
     import { onMount, tick } from 'svelte';
     let socket
+    let sockets
     let message
     let rateData = []
     let data = []
     const column = ["code","ask","heigh","low"]
     onMount(() => {
         socket = new WebSocket('ws://localhost:8000/ws');
+        sockets = new WebSocket('ws://localhost:8000/wss');
         socket.onopen = () => {
         console.log('socket connected');
     };
@@ -16,8 +18,10 @@
     //   console.log(message);
       const d = JSON.parse(message)
       rateData = d.quotes
-      console.log(rateData[0]);
     };
+    sockets.onmessage = (ev) => {
+        console.log(ev.data);
+    }
   });
 </script>
 
