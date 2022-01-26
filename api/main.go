@@ -2,6 +2,7 @@ package main
 
 import (
 	"app/logging"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,7 +11,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"bytes"
 
 	"github.com/gorilla/mux"
 	"github.com/labstack/echo/v4"
@@ -33,96 +33,6 @@ func sayhelloName(w http.ResponseWriter, r *http.Request) {
 
 func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello, World")
-}
-
-func handleWebSocket(c echo.Context) error {
-	websocket.Handler(func(ws *websocket.Conn) {
-		defer ws.Close()
-
-		// 初回のメッセージを送信
-		err := websocket.Message.Send(ws, "Server: Hello, Client!")
-		if err != nil {
-			c.Logger().Error(err)
-		}
-
-		// Client からのメッセージを読み込む
-		var msg string
-		err = websocket.Message.Receive(ws, &msg)
-		if err != nil {
-			c.Logger().Error(err)
-		}
-
-		// Client からのメッセージを元に返すメッセージを作成し送信する
-		er := websocket.Message.Send(ws, fmt.Sprintf("eceived!"))
-		if er != nil {
-			c.Logger().Error(er)
-		}
-		for {
-			websocket.Message.Send(ws, fmt.Sprintln("hello"))
-			c.Logger().Info("time")
-			time.Sleep(3 * time.Second)
-		}
-
-	}).ServeHTTP(c.Response(), c.Request())
-	return nil
-}
-
-func getRealtimeETHRate(c echo.Context, coin string) interface{} {
-	wsUrl := "wss://api.coin.z.com/ws/public/v1"
-	baseUrl := "https://api.coin.z.com"
-	sendMsg := (`{
-        "command": "subscribe",
-        "channel": "ticker",
-        "symbol": "ETH"
-    }`)
-
-	var rate string
-
-    ws, _ := websocket.Dial(wsUrl, "", baseUrl)
-    websocket.Message.Send(ws, sendMsg)
-	for {
-		err := websocket.Message.Receive(ws, &rate)
-		if err != nil {
-			c.Logger().Error(err)
-		}
-		fmt.Print(rate)
-	}
-}
-func getRealtimeBTCRate(c echo.Context) error {
-	wsUrl := "wss://api.coin.z.com/ws/public/v1"
-	baseUrl := "https://api.coin.z.com"
-	sendMsg := (`{
-        "command": "subscribe",
-        "channel": "ticker",
-        "symbol": "BTC"
-    }`)
-
-	var rate string
-
-    ws, _ := websocket.Dial(wsUrl, "", baseUrl)
-    websocket.Message.Send(ws, sendMsg)
-	websocket.Handler(func(wss *websocket.Conn) {
-	for {
-		err := websocket.Message.Receive(wss,&rate)
-		var buf bytes.Buffer
-        json.Indent(&buf, []byte(rate), "", "  ")
-
-		if err != nil {
-			fmt.Println("ERRRRRRRRR")
-			fmt.Println(err)
-		}
-		websocket.JSON.Send(wss,buf.String())
-	}
-
-	}).ServeHTTP(c.Response(), c.Request())
-	return nil
-	// for {
-	// 	err := websocket.Message.Receive(ws, &rate)
-	// 	if err != nil {
-	// 		c.Logger().Error(err)
-	// 	}
-	// 	fmt.Print(rate)
-	// }
 }
 
 func autoWebSocket(c echo.Context) error {
@@ -164,15 +74,74 @@ func getExchangeRate(c echo.Context) interface{} {
 
 }
 
+func SendSubscribeRequest(c echo.Context) error {
+	fmt.Print("send subscribe request")
+	wsUrl := "wss://api.coin.z.com/ws/public/v1"
+	origin := "https://api.coin.z.com"
+	btc_message := (`{
+		"command": "subscribe",
+		"channel": "ticker",
+		"symbol": "ETH_JPY"
+	}`)
+	eth_message := (`{
+		"command": "subscribe",
+		"channel": "ticker",
+		"symbol": "BTC_JPY"
+	}`)
+	ws, _ := websocket.Dial(wsUrl, "", origin)
+	websocket.Message.Send(ws, btc_message)
+	fmt.Println("sended1")
+	time.Sleep(time.Second * 2)
+	websocket.Message.Send(ws, eth_message)
+	fmt.Println("sended2")
+	return nil
+}
+
+func GetRealtimeBtcRate(c echo.Context) error {
+	wsUrl := "wss://api.coin.z.com/ws/public/v1"
+	origin := "https://api.coin.z.com"
+	ws, _ := websocket.Dial(wsUrl, "", origin)
+	var receiveMsg string
+	websocket.Handler(func(wss *websocket.Conn) {
+		for {
+			websocket.Message.Receive(ws, &receiveMsg)
+			var buf bytes.Buffer
+			json.Indent(&buf, []byte(receiveMsg), "", "  ")
+			websocket.JSON.Send(wss, buf.String())
+		}
+	}).ServeHTTP(c.Response(), c.Request())
+	return nil
+}
+
+//maybe i can perform it returning ws construc
+func GetRealtimeEthRate(c echo.Context) error {
+	wsUrl := "wss://api.coin.z.com/ws/public/v1"
+	origin := "https://api.coin.z.com"
+	var receiveMsg string
+	ws, _ := websocket.Dial(wsUrl, "", origin)
+	websocket.Handler(func(wss *websocket.Conn) {
+		for {
+			websocket.Message.Receive(ws, &receiveMsg)
+			fmt.Println(receiveMsg)
+			var buf bytes.Buffer
+			json.Indent(&buf, []byte(receiveMsg), "", "  ")
+			websocket.JSON.Send(wss, buf.String())
+		}
+	}).ServeHTTP(c.Response(), c.Request())
+	return nil
+}
 func main() {
 	// conf := config.Config
 	e := echo.New()
 	e.Use(middleware.Logger())
 	e.Static("/", "public")
+	e.Use(middleware.CORS())
 	e.GET("/ws", autoWebSocket)
-	e.GET("/wss", getRealtimeBTCRate)
+	e.GET("/realtime_btc_rate", GetRealtimeBtcRate)
+	e.GET("/realtime_eth_rate", GetRealtimeEthRate)
+	e.GET("/first", SendSubscribeRequest)
 	e.Logger.Fatal(e.Start(":80"))
-	
+
 	r := mux.NewRouter()
 	logger := logging.Logger()
 	http.HandleFunc("/hello", sayhelloName)

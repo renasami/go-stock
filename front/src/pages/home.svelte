@@ -1,26 +1,26 @@
-<script>
+<script lang="ts">
     import { onMount, tick } from 'svelte';
+    import type  {Rate}   from '../types'
     let socket
-    let sockets
+    let btc, eth
     let message
-    let rateData = []
+    let btc_rate:Rate
+    let eth_rate:Rate
     let data = []
-    const column = ["code","ask","heigh","low"]
+    const column = ["symbol","ask","bid","high","last","low","volume"]
     onMount(() => {
         socket = new WebSocket('ws://localhost:8000/ws');
-        sockets = new WebSocket('ws://localhost:8000/wss');
+        eth = new WebSocket('ws://localhost:8000/realtime_eth_rate');
+        btc = new WebSocket('ws://localhost:8000/realtime_btc_rate');
         socket.onopen = () => {
         console.log('socket connected');
     };
-    socket.onmessage = (event) => {
-      if(!event.data) { return }
-      message = event.data
-    //   console.log(message);
-      const d = JSON.parse(message)
-      rateData = d.quotes
-    };
-    sockets.onmessage = (ev) => {
-        console.log(ev.data);
+    btc.onmessage = (ev) => {
+        btc_rate = JSON.parse(JSON.parse(ev.data))
+        console.log('btc')
+    }
+    eth.onmessage = (ev) => {
+        eth_rate = JSON.parse(JSON.parse(ev.data))
     }
   });
 </script>
@@ -29,21 +29,18 @@
 
 <table>
     <tr>
-
 		{#each column as col}
 			<th>{col}</th>
 		{/each}
     </tr>
-        {#each rateData as data}
-            <!-- {#each data as d} -->
-                <tr>
-                    <td><b>{data.currencyPairCode}</b></td>
-                    <td>{data.ask}</td>
-                    <td>{data.high}</td>
-                    <td>{data.low}</td>
-                </tr>
-            <!-- {/each} -->
-        {/each}
+    <tr>
+        {#if btc_rate && eth_rate}
+            {#each column as sym}
+            <td>{btc_rate[sym]}</td>
+            <td>{eth_rate[sym]}</td>
+            {/each}
+        {/if}
+    </tr>
 </table>
 
 <style global  lang="postcss">
